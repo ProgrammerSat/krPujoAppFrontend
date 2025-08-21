@@ -108,6 +108,10 @@ const UserDashboard = ({route}) => {
     }
   };
 
+  const handleSubscribe = () => {
+    navigation.navigate('Subscription'); // Change 'Subscription' to your actual subscription route name
+  };
+
   if (loading && !dashboardData) {
     return (
       <View style={styles.loadingContainer}>
@@ -124,18 +128,32 @@ const UserDashboard = ({route}) => {
   if (!dashboardData) {
     return (
       <View style={styles.errorContainer}>
+        <TouchableOpacity
+          style={styles.errorBackButton}
+          onPress={() => navigation.goBack()}>
+          <Text style={styles.errorBackButtonText}>← Back</Text>
+        </TouchableOpacity>
         <Text style={styles.errorText}>No data found</Text>
+        <Text style={styles.errorSubText}>
+          Unable to load your dashboard data.{'\n'}Please check your connection
+          and try again.
+        </Text>
         <TouchableOpacity
           style={styles.retryButton}
           onPress={fetchDashboardData}>
           <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.subscribeButton}
+          onPress={handleSubscribe}>
+          <Text style={styles.subscribeButtonText}>Subscribe Now</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   const {userType, subscriptionDetails, subscriptionStatus, couponDetails} =
-    dashboardData;
+    dashboardData || {};
 
   return (
     <ScrollView
@@ -200,70 +218,94 @@ const UserDashboard = ({route}) => {
         </View>
 
         <View style={styles.subscriptionInfo}>
-          {subscriptionDetails.name && (
-            <InfoRow label="Name" value={subscriptionDetails.name} />
-          )}
-          {subscriptionDetails.cooperativeSociety && (
-            <InfoRow
-              label="Cooperative Society"
-              value={subscriptionDetails.cooperativeSociety}
-            />
-          )}
-          {subscriptionDetails.flat && (
-            <InfoRow label="Flat" value={subscriptionDetails.flat} />
-          )}
-          {subscriptionDetails.totalPaid !== undefined && (
-            <InfoRow
-              label="Total Paid"
-              value={`₹${subscriptionDetails.totalPaid}`}
-            />
-          )}
-          {subscriptionDetails.familyAmountPaid !== undefined && (
-            <InfoRow
-              label="Family Amount Paid"
-              value={`₹${subscriptionDetails.familyAmountPaid}`}
-            />
+          {subscriptionDetails &&
+          Object.keys(subscriptionDetails).length > 0 ? (
+            <>
+              {subscriptionDetails.name && (
+                <InfoRow label="Name" value={subscriptionDetails.name} />
+              )}
+              {subscriptionDetails.cooperativeSociety && (
+                <InfoRow
+                  label="Cooperative Society"
+                  value={subscriptionDetails.cooperativeSociety}
+                />
+              )}
+              {subscriptionDetails.flat && (
+                <InfoRow label="Flat" value={subscriptionDetails.flat} />
+              )}
+              {subscriptionDetails.totalPaid !== undefined && (
+                <InfoRow
+                  label="Total Paid"
+                  value={`₹${subscriptionDetails.totalPaid}`}
+                />
+              )}
+              {subscriptionDetails.familyAmountPaid !== undefined && (
+                <InfoRow
+                  label="Family Amount Paid"
+                  value={`₹${subscriptionDetails.familyAmountPaid}`}
+                />
+              )}
+            </>
+          ) : (
+            <View style={styles.noSubscriptionContainer}>
+              <Text style={styles.noSubscriptionIcon}>📋</Text>
+              <Text style={styles.noSubscriptionTitle}>
+                No Subscription Found
+              </Text>
+              <Text style={styles.noSubscriptionText}>
+                You don't have an active subscription yet.{'\n'}
+                Subscribe now to access your puja services and get detailed
+                dashboard information.
+              </Text>
+              <TouchableOpacity
+                style={styles.subscribeNowButton}
+                onPress={handleSubscribe}>
+                <Text style={styles.subscribeNowButtonText}>Subscribe Now</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </Animated.View>
 
-      {/* Coupon Details */}
-      <Animated.View
-        style={[
-          styles.couponSection,
-          {
-            opacity: fadeAnim,
-            transform: [{translateY: slideAnim}],
-          },
-        ]}>
-        <Text style={styles.sectionTitle}>Coupon Details</Text>
+      {/* Coupon Details - Only show if subscription exists */}
+      {subscriptionDetails && couponDetails && (
+        <Animated.View
+          style={[
+            styles.couponSection,
+            {
+              opacity: fadeAnim,
+              transform: [{translateY: slideAnim}],
+            },
+          ]}>
+          <Text style={styles.sectionTitle}>Coupon Details</Text>
 
-        <View style={styles.couponGrid}>
-          {Object.entries(couponDetails)
-            .filter(([key]) => key !== 'grandTotalAmount')
-            .map(([day, details], index) => (
-              <Animated.View
-                key={day}
-                style={[
-                  styles.couponCard,
-                  {
-                    transform: [{scale: scaleAnim}],
-                  },
-                ]}>
-                <Text style={styles.couponDay}>{day}</Text>
-                <Text style={styles.couponCount}>{details.count}</Text>
-                <Text style={styles.couponAmount}>₹{details.amount}</Text>
-              </Animated.View>
-            ))}
-        </View>
+          <View style={styles.couponGrid}>
+            {Object.entries(couponDetails)
+              .filter(([key]) => key !== 'grandTotalAmount')
+              .map(([day, details], index) => (
+                <Animated.View
+                  key={day}
+                  style={[
+                    styles.couponCard,
+                    {
+                      transform: [{scale: scaleAnim}],
+                    },
+                  ]}>
+                  <Text style={styles.couponDay}>{day}</Text>
+                  <Text style={styles.couponCount}>{details.count}</Text>
+                  <Text style={styles.couponAmount}>₹{details.amount}</Text>
+                </Animated.View>
+              ))}
+          </View>
 
-        <View style={styles.grandTotalCard}>
-          <Text style={styles.grandTotalLabel}>Grand Total</Text>
-          <Text style={styles.grandTotalAmount}>
-            ₹{subscriptionDetails.userSubscriptionAmount}
-          </Text>
-        </View>
-      </Animated.View>
+          <View style={styles.grandTotalCard}>
+            <Text style={styles.grandTotalLabel}>Grand Total</Text>
+            <Text style={styles.grandTotalAmount}>
+              ₹{subscriptionDetails?.userSubscriptionAmount || 0}
+            </Text>
+          </View>
+        </Animated.View>
+      )}
 
       {/* Action Buttons */}
       <Animated.View
@@ -274,15 +316,21 @@ const UserDashboard = ({route}) => {
             transform: [{scale: scaleAnim}],
           },
         ]}>
-        {/* <TouchableOpacity style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Download Receipt</Text>
-        </TouchableOpacity> */}
-
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate('Contact Us')}>
-          <Text style={styles.secondaryButtonText}>Contact Support</Text>
-        </TouchableOpacity>
+        {subscriptionDetails ? (
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => navigation.navigate('Contact Us')}>
+            <Text style={styles.secondaryButtonText}>Contact Support</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={handleSubscribe}>
+            <Text style={styles.primaryButtonText}>
+              Get Started with Subscription
+            </Text>
+          </TouchableOpacity>
+        )}
       </Animated.View>
     </ScrollView>
   );
@@ -358,13 +406,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
-  goBackButton: {
-    backgroundColor: '#FFC107',
+  subscribeButton: {
+    backgroundColor: '#28A745',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 25,
   },
-  goBackText: {
+  subscribeButtonText: {
     color: 'white',
     fontWeight: '600',
     fontSize: 16,
@@ -462,22 +510,44 @@ const styles = StyleSheet.create({
   subscriptionInfo: {
     gap: 12,
   },
-  noDataContainer: {
+  noSubscriptionContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 30,
+    paddingHorizontal: 20,
   },
-  noDataText: {
+  noSubscriptionIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  noSubscriptionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  noSubscriptionText: {
     fontSize: 16,
     color: '#666',
-    fontWeight: '500',
     textAlign: 'center',
-    marginBottom: 8,
+    lineHeight: 24,
+    marginBottom: 24,
   },
-  noDataSubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    lineHeight: 20,
+  subscribeNowButton: {
+    backgroundColor: '#28A745',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 25,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  subscribeNowButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   infoRow: {
     flexDirection: 'row',

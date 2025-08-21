@@ -12,6 +12,8 @@ import FamilyListScreen from '../screens/FamilyListScreen';
 import ContactUs from '../screens/contactus';
 import AdminApproval from '../screens/adminApproval';
 import UserDashboard from '../screens/userDashboard';
+import VerifySecretCode from '../screens/verifySecretCode';
+import updatePasswordScreen from '../screens/updatePasswordScreen';
 
 const Stack = createStackNavigator();
 
@@ -106,6 +108,16 @@ export default props => {
         <Stack.Screen name="FamilyList" component={FamilyListScreen} />
         <Stack.Screen name="Admin Approval" component={AdminApproval} />
         <Stack.Screen name="User Dashboard" component={UserDashboard} />
+        <Stack.Screen name="Verify Secret" component={VerifySecretCode} />
+        <Stack.Screen
+          name="UpdatePassword"
+          component={updatePasswordScreen}
+          initialParams={{
+            userId: props?.route?.params?.userId,
+            phoneNumber: props?.route?.params?.phoneNumber,
+          }}
+          options={{headerShown: false}}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

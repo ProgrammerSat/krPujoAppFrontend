@@ -10,6 +10,7 @@ import {
   Dimensions,
   Keyboard,
   Alert,
+  Image,
 } from 'react-native';
 
 import BASE_URL from '../env';
@@ -111,7 +112,11 @@ const Login = ({navigation}) => {
             },
           ]}>
           <View style={styles.logoContainer}>
-            <Text style={styles.logoText}>🙏</Text>
+            <Image
+              source={require('../assets/Images/durgaMaFace.jpeg')}
+              style={styles.logoImage}
+              resizeMode="cover"
+            />
           </View>
           <Text style={styles.appTitle}>Puja Management</Text>
           <Text style={styles.subtitle}>Welcome back</Text>
@@ -169,11 +174,10 @@ const Login = ({navigation}) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => navigation?.navigate?.('Register')}
+            onPress={() => navigation?.navigate?.('Verify Secret')}
             style={styles.registerLink}>
             <Text style={styles.linkText}>
-              Don't have an account?{' '}
-              <Text style={styles.linkTextBold}>Register</Text>
+              Forgot Password? <Text style={styles.linkTextBold}>Update</Text>
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -216,6 +220,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
+    overflow: 'hidden', // Important for circular image
+  },
+  logoImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 35, // Make it circular
   },
   logoText: {
     fontSize: 40,
@@ -304,7 +314,7 @@ const styles = StyleSheet.create({
   },
   registerLink: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 10,
   },
   linkText: {
     color: '#666',
