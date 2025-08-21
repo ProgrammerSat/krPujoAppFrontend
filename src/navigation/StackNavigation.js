@@ -11,6 +11,7 @@ import PujaRegistrationScreen from '../screens/PujaRegistrationScreen';
 import FamilyListScreen from '../screens/FamilyListScreen';
 import ContactUs from '../screens/contactus';
 import AdminApproval from '../screens/adminApproval';
+import UserDashboard from '../screens/userDashboard';
 
 const Stack = createStackNavigator();
 
@@ -104,6 +105,7 @@ export default props => {
         />
         <Stack.Screen name="FamilyList" component={FamilyListScreen} />
         <Stack.Screen name="Admin Approval" component={AdminApproval} />
+        <Stack.Screen name="User Dashboard" component={UserDashboard} />
       </Stack.Navigator>
     </NavigationContainer>
   );

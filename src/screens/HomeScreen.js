@@ -339,6 +339,18 @@ export default function HomePage() {
         />
 
         <UserCard
+          title="My Dashboard"
+          subtitle="View your subscription details"
+          backgroundColor="#4ECDC4"
+          icon="📱"
+          onPress={() =>
+            navigation.navigate('User Dashboard', {
+              phoneNumber: route.params?.phoneNumber,
+            })
+          }
+        />
+
+        <UserCard
           title="Help & Support"
           subtitle="Get assistance & FAQs"
           backgroundColor="#f7d258ff"

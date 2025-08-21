@@ -10,6 +10,8 @@ import {
   StatusBar,
   Modal,
   TextInput,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 
 const {width, height} = Dimensions.get('window');
@@ -19,7 +21,11 @@ import BASE_URL from '../env';
 const api = {
   getPendingSubscriptions: () => fetch(`${BASE_URL}/admin/pending`),
   getApprovedSubscriptions: () => fetch(`${BASE_URL}/admin/approved`),
-  getRejectedSubscriptions: () => fetch(`${BASE_URL}/admin/rejected`), // You'll need to add this route
+  getRejectedSubscriptions: () => fetch(`${BASE_URL}/admin/rejected`),
+  getAllPaymentsWithImages: () =>
+    fetch(`${BASE_URL}/userPayment/getAllPaymentsWithImages`),
+  getPaymentWithImage: paymentId =>
+    fetch(`${BASE_URL}/userPayment/getPaymentWithImage/${paymentId}`),
   updateSubscriptionStatus: (
     phoneNumber,
     newStatus,
@@ -33,6 +39,7 @@ const api = {
         phoneNumber,
         newStatus,
         updatedBy,
+        rejectionReason,
       }),
     }),
 };
@@ -42,25 +49,20 @@ const formatDate = dateValue => {
   if (!dateValue) return 'N/A';
 
   try {
-    // Handle different date formats
     let dateObj;
 
     if (typeof dateValue === 'string') {
-      // Try to parse ISO string
       dateObj = new Date(dateValue);
     } else if (typeof dateValue === 'number') {
-      // Handle timestamp
       dateObj = new Date(dateValue);
     } else {
       return 'N/A';
     }
 
-    // Check if date is valid
     if (isNaN(dateObj.getTime())) {
       return 'N/A';
     }
 
-    // Format to YYYY-MM-DD
     return dateObj.toISOString().split('T')[0];
   } catch (error) {
     console.warn('Date formatting error:', error);
@@ -81,9 +83,12 @@ const AdminApproval = ({navigation}) => {
     1: [],
     2: [],
   });
+  const [paymentsData, setPaymentsData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalType, setModalType] = useState(''); // 'approve' or 'reject'
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [modalType, setModalType] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -91,6 +96,7 @@ const AdminApproval = ({navigation}) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const cardTransformAnim = useRef(new Animated.Value(1)).current;
   const modalScaleAnim = useRef(new Animated.Value(0)).current;
+  const imageModalScaleAnim = useRef(new Animated.Value(0)).current;
 
   const tabs = [
     {
@@ -113,22 +119,37 @@ const AdminApproval = ({navigation}) => {
     },
   ];
 
-  //fetch subscription
+  // Function to find payment image for a subscription
+  const findPaymentImage = item => {
+    const payment = paymentsData.find(
+      payment =>
+        payment.userID?.phoneNumber === getPhoneNumber(item) ||
+        payment.userID?._id === item.userID?._id,
+    );
+    return payment?.imageUrl || null;
+  };
+
+  //fetch subscription and payment data
   const fetchSubscriptionData = async () => {
     setLoading(true);
     try {
-      const [pendingRes, approvedRes, rejectedRes] = await Promise.all([
-        api.getPendingSubscriptions(),
-        api.getApprovedSubscriptions(),
-        api.getRejectedSubscriptions(),
-      ]);
+      const [pendingRes, approvedRes, rejectedRes, paymentsRes] =
+        await Promise.all([
+          api.getPendingSubscriptions(),
+          api.getApprovedSubscriptions(),
+          api.getRejectedSubscriptions(),
+          api.getAllPaymentsWithImages(),
+        ]);
 
       const pending = await pendingRes.json();
       const approved = await approvedRes.json();
       const rejected = await rejectedRes.json();
+      const payments = await paymentsRes.json();
 
-      // console.log('Pending Response:', pending);
-      // console.log('Approved Response:', approved);
+      console.log('Payments Response:', payments);
+
+      // Store payments data
+      setPaymentsData(payments.payments || []);
 
       // Transform backend data to match your UI format
       const transformedData = {
@@ -146,6 +167,7 @@ const AdminApproval = ({navigation}) => {
           avatar: '👨‍💼',
           priority: 'medium',
           phoneNumber: getPhoneNumber(item),
+          userID: item.userID,
         })),
         1: approved.map(item => ({
           id: item._id,
@@ -160,6 +182,7 @@ const AdminApproval = ({navigation}) => {
           ),
           avatar: '👨‍💼',
           phoneNumber: getPhoneNumber(item),
+          userID: item.userID,
         })),
         2: rejected.map(item => ({
           id: item._id,
@@ -174,13 +197,13 @@ const AdminApproval = ({navigation}) => {
           ),
           avatar: '👨‍💼',
           phoneNumber: getPhoneNumber(item),
-        })), // Add rejected data when route is available
+          userID: item.userID,
+        })),
       };
 
       setSubscriptionData(transformedData);
     } catch (error) {
       console.error('Error fetching data:', error);
-      // Set empty data on error to prevent crashes
       setSubscriptionData({
         0: [],
         1: [],
@@ -196,7 +219,6 @@ const AdminApproval = ({navigation}) => {
   }, [refreshTrigger]);
 
   const handleTabPress = index => {
-    // Scale animation for tab press
     Animated.sequence([
       Animated.timing(scaleAnim, {
         toValue: 0.95,
@@ -210,14 +232,13 @@ const AdminApproval = ({navigation}) => {
       }),
     ]).start();
 
-    // Reset card transform animation
     cardTransformAnim.setValue(1);
 
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 150,
-        useNativeDriver: false, // Changed to false for layout properties
+        useNativeDriver: false,
       }),
       Animated.timing(slideAnim, {
         toValue: (index * (width - 60)) / 3,
@@ -227,7 +248,7 @@ const AdminApproval = ({navigation}) => {
       Animated.timing(cardTransformAnim, {
         toValue: 0.95,
         duration: 150,
-        useNativeDriver: false, // Changed to false for layout properties
+        useNativeDriver: false,
       }),
     ]).start(() => {
       setActiveTab(index);
@@ -235,12 +256,12 @@ const AdminApproval = ({navigation}) => {
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 200,
-          useNativeDriver: false, // Changed to false for layout properties
+          useNativeDriver: false,
         }),
         Animated.timing(cardTransformAnim, {
           toValue: 1,
           duration: 200,
-          useNativeDriver: false, // Changed to false for layout properties
+          useNativeDriver: false,
         }),
       ]).start();
     });
@@ -252,7 +273,6 @@ const AdminApproval = ({navigation}) => {
     setRejectionReason('');
     setModalVisible(true);
 
-    // Animate modal in
     Animated.spring(modalScaleAnim, {
       toValue: 1,
       useNativeDriver: true,
@@ -260,7 +280,6 @@ const AdminApproval = ({navigation}) => {
   };
 
   const hideModal = () => {
-    // Animate modal out
     Animated.timing(modalScaleAnim, {
       toValue: 0,
       duration: 200,
@@ -269,6 +288,28 @@ const AdminApproval = ({navigation}) => {
       setModalVisible(false);
       setSelectedItem(null);
       setRejectionReason('');
+    });
+  };
+
+  const showImageModal = imageUrl => {
+    setSelectedImage(imageUrl);
+    setImageModalVisible(true);
+    Animated.spring(imageModalScaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  console.log('SelectedImage modal:', selectedImage);
+
+  const hideImageModal = () => {
+    Animated.timing(imageModalScaleAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setImageModalVisible(false);
+      setSelectedImage(null);
     });
   };
 
@@ -281,17 +322,15 @@ const AdminApproval = ({navigation}) => {
         selectedItem.phoneNumber,
         newStatus,
         'admin',
+        rejectionReason,
       );
 
       if (response.ok) {
-        // Refresh data after successful update
         setRefreshTrigger(prev => prev + 1);
 
-        // Switch to appropriate tab if current tab becomes empty
         setTimeout(() => {
           const currentTabData = subscriptionData[activeTab];
           if (currentTabData.length <= 1) {
-            // Will be empty after removal
             const targetTab = modalType === 'approve' ? 1 : 2;
             handleTabPress(targetTab);
           }
@@ -327,6 +366,37 @@ const AdminApproval = ({navigation}) => {
     }
   };
 
+  const renderPaymentImage = item => {
+    const imageUrl = findPaymentImage(item);
+
+    if (!imageUrl) {
+      return (
+        <View style={styles.noImageContainer}>
+          <View style={styles.noImageIcon}>
+            <Text style={styles.noImageText}>📷</Text>
+          </View>
+          <Text style={styles.noImageLabel}>No payment image</Text>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.paymentImageContainer}
+        onPress={() => showImageModal(imageUrl)}
+        activeOpacity={0.8}>
+        <Image
+          source={{uri: imageUrl}}
+          style={styles.paymentImage}
+          resizeMode="cover"
+        />
+        <View style={styles.imageOverlay}>
+          <Text style={styles.imageOverlayText}>📷 Tap to view</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   const renderSubscriptionCard = (item, index) => {
     const isApproved = activeTab === 1;
     const isRejected = activeTab === 2;
@@ -356,7 +426,6 @@ const AdminApproval = ({navigation}) => {
           },
         ]}>
         <View style={styles.cardContent}>
-          {/* Priority Indicator for Pending */}
           {isPending && (
             <View
               style={[
@@ -434,6 +503,17 @@ const AdminApproval = ({navigation}) => {
                 </Text>
               </View>
             </View>
+          </View>
+
+          {/* Payment Image Section */}
+          <View style={styles.paymentSection}>
+            <View style={styles.paymentSectionHeader}>
+              <View style={styles.paymentIconContainer}>
+                <Text style={styles.paymentIcon}>💳</Text>
+              </View>
+              <Text style={styles.paymentSectionTitle}>Payment Proof</Text>
+            </View>
+            {renderPaymentImage(item)}
           </View>
 
           <View style={styles.dateContainer}>
@@ -634,7 +714,6 @@ const AdminApproval = ({navigation}) => {
               },
             ]}>
             <View style={styles.modalContent}>
-              {/* Modal Header */}
               <View
                 style={[
                   styles.modalHeader,
@@ -653,7 +732,6 @@ const AdminApproval = ({navigation}) => {
                 </Text>
               </View>
 
-              {/* User Info */}
               {selectedItem && (
                 <View style={styles.modalUserInfo}>
                   <View style={styles.modalAvatar}>
@@ -675,7 +753,6 @@ const AdminApproval = ({navigation}) => {
                 </View>
               )}
 
-              {/* Confirmation Message */}
               <View style={styles.modalMessage}>
                 <Text style={styles.modalMessageText}>
                   {modalType === 'approve'
@@ -684,7 +761,6 @@ const AdminApproval = ({navigation}) => {
                 </Text>
               </View>
 
-              {/* Rejection Reason Input (only for reject) */}
               {modalType === 'reject' && (
                 <View style={styles.reasonInputContainer}>
                   <Text style={styles.reasonInputLabel}>
@@ -703,7 +779,6 @@ const AdminApproval = ({navigation}) => {
                 </View>
               )}
 
-              {/* Action Buttons */}
               <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.modalCancelButton]}
@@ -729,6 +804,44 @@ const AdminApproval = ({navigation}) => {
                 </TouchableOpacity>
               </View>
             </View>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Image Modal */}
+      <Modal
+        visible={imageModalVisible}
+        transparent={true}
+        animationType="fade"
+        statusBarTranslucent={true}>
+        <View style={styles.imageModalOverlay}>
+          <TouchableOpacity
+            style={styles.imageModalCloseArea}
+            onPress={hideImageModal}
+            activeOpacity={1}
+          />
+          <Animated.View
+            style={[
+              styles.imageModalContainer,
+              {
+                transform: [{scale: imageModalScaleAnim}],
+              },
+            ]}>
+            <View style={styles.imageModalHeader}>
+              <Text style={styles.imageModalTitle}>Payment Proof</Text>
+              <TouchableOpacity
+                style={styles.imageModalCloseButton}
+                onPress={hideImageModal}>
+                <Text style={styles.imageModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {selectedImage && (
+              <Image
+                source={{uri: selectedImage}}
+                style={styles.fullScreenImage}
+                resizeMode="contain"
+              />
+            )}
           </Animated.View>
         </View>
       </Modal>
@@ -1288,6 +1401,166 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  paymentSection: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  paymentSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  paymentIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  paymentIcon: {
+    fontSize: 16,
+  },
+  paymentSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  paymentImageContainer: {
+    position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 0},
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  paymentImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: 12,
+  },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  imageOverlayText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  noImageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  noImageIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  noImageText: {
+    fontSize: 20,
+    opacity: 0.5,
+  },
+  noImageLabel: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+
+  // Image Modal Styles
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  imageModalCloseArea: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 1,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 10},
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+  },
+  imageModalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    margin: 20,
+    maxHeight: height * 0.8,
+    maxWidth: width * 0.9,
+    overflow: 'hidden',
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: {width: 10, height: 10},
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+  },
+  imageModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
+  },
+  imageModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    flex: 1,
+  },
+  imageModalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageModalCloseText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: 'bold',
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: height * 0.6,
+    backgroundColor: '#F9FAFB',
   },
 });
 
