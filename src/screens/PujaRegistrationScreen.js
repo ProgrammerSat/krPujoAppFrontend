@@ -502,7 +502,7 @@ export default function PujaRegistrationScreen({navigation}) {
                 enabled={!isLoading}>
                 <Picker.Item label="Cash" value="cash" />
                 <Picker.Item label="UPI" value="upi" />
-                <Picker.Item label="Bank Transfer" value="bank" />
+                <Picker.Item label="Bank Transfer" value="bank payment" />
               </Picker>
             </View>
           </View>

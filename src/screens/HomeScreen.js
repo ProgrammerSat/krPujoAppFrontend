@@ -341,7 +341,7 @@ export default function HomePage() {
         <UserCard
           title="Help & Support"
           subtitle="Get assistance & FAQs"
-          backgroundColor="#FFEAA7"
+          backgroundColor="#f7d258ff"
           icon="❓"
           onPress={() => {
             navigation.navigate('Contact Us');
