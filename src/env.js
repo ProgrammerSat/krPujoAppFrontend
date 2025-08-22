@@ -1,3 +1,3 @@
-const BASE_URL = 'https://291f1ae2dd83.ngrok-free.app';
+const BASE_URL = 'http://3.72.104.209:3000';
 
 export default BASE_URL;
