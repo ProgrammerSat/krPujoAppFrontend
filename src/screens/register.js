@@ -139,7 +139,7 @@ const Register = () => {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerContent}>
-              <Text style={styles.appTitle}>Puja Management App</Text>
+              <Text style={styles.appTitle}>Q Block Puja App</Text>
               <Text style={styles.subtitle}>Create Your Account</Text>
             </View>
             <View style={styles.omSymbol}>

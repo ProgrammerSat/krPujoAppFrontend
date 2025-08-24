@@ -13,19 +13,105 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-// Removed LinearGradient dependency
+import {useNavigation} from '@react-navigation/native';
 
 const {width, height} = Dimensions.get('window');
+
+// Modern Back Button Component
+const ModernBackButton = ({onPress}) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  const handlePressIn = () => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 0.9,
+        friction: 6,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rotateAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const rotateInterpolate = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '-5deg'],
+  });
+
+  return (
+    <TouchableOpacity
+      style={styles.backButtonContainer}
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}>
+      <Animated.View
+        style={[
+          styles.backButton,
+          {
+            transform: [{scale: scaleAnim}, {rotate: rotateInterpolate}],
+          },
+        ]}>
+        {/* Arrow using Unicode */}
+        <Text style={styles.backArrow}>‹</Text>
+
+        {/* Press effect overlay */}
+        <Animated.View
+          style={[
+            styles.backButtonOverlay,
+            {
+              opacity: opacityAnim,
+            },
+          ]}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
 
 const ContactUs = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const navigation = useNavigation();
 
   // Animation references
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const backButtonFadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Initial animation
@@ -44,6 +130,13 @@ const ContactUs = () => {
         toValue: 1,
         tension: 50,
         friction: 7,
+        useNativeDriver: true,
+      }),
+      // Back button entrance animation
+      Animated.timing(backButtonFadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        delay: 400,
         useNativeDriver: true,
       }),
     ]).start();
@@ -68,45 +161,39 @@ const ContactUs = () => {
     return () => pulseAnimation.stop();
   }, []);
 
-  const handleInputChange = (name, value) => {
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-  };
-
-  const handleSubmit = async () => {
-    if (!formData.name || !formData.email || !formData.message) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    // Simulate form submission
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSubmitted(true);
-      Alert.alert('Success', 'Your message has been sent successfully!');
-      setTimeout(() => setSubmitted(false), 3000);
-      setFormData({name: '', email: '', phone: '', subject: '', message: ''});
-    }, 2000);
-  };
-
   const handleCall = () => {
-    Linking.openURL('tel:+917003746062');
+    Linking.openURL('tel:+919748744345');
   };
 
   const handleEmail = () => {
-    Linking.openURL('mailto:krconsultancy0107@gmail.com');
+    Linking.openURL('mailto:qbrsca@gmail.com');
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#FF6B35" />
 
-      {/* Header */}
+      {/* Header with Back Button */}
       <View style={styles.header}>
+        {/* Back Button */}
+        <Animated.View
+          style={[
+            styles.backButtonWrapper,
+            {
+              opacity: backButtonFadeAnim,
+              transform: [
+                {
+                  translateX: backButtonFadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-50, 0],
+                  }),
+                },
+              ],
+            },
+          ]}>
+          <ModernBackButton onPress={() => navigation.goBack()} />
+        </Animated.View>
+
         <Animated.View
           style={[
             styles.headerContent,
@@ -143,7 +230,7 @@ const ContactUs = () => {
             <Text style={styles.contactSubtitle}>
               Available 24/7 for support
             </Text>
-            <Text style={styles.contactInfo}>+91 70037 46062</Text>
+            <Text style={styles.contactInfo}>+91 97487 44345</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.contactCard} onPress={handleEmail}>
@@ -154,7 +241,7 @@ const ContactUs = () => {
             <Text style={styles.contactSubtitle}>
               Get response within 24hrs
             </Text>
-            <Text style={styles.contactInfo}>krconsultancy0107@gmail.com</Text>
+            <Text style={styles.contactInfo}>qbrsca@gmail.com</Text>
           </TouchableOpacity>
         </Animated.View>
 
@@ -218,9 +305,54 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     backgroundColor: '#FF6B35',
+    position: 'relative',
   },
+
+  // Back Button Styles - CENTERED
+  backButtonWrapper: {
+    position: 'absolute',
+    top: 40,
+    left: 20,
+    zIndex: 10,
+  },
+  backButtonContainer: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    overflow: 'hidden',
+  },
+  backArrow: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginLeft: 0, // Removed margin to center
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  backButtonOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+  },
+
   headerContent: {
     alignItems: 'center',
+    marginTop: 20, // Add margin to account for back button
   },
   headerIcon: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',

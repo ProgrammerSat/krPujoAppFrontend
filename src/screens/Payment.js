@@ -10,17 +10,19 @@ import {
   ScrollView,
   Dimensions,
   Animated as RNAnimated,
+  Alert,
+  PermissionsAndroid,
 } from 'react-native';
-import * as ImagePicker from 'react-native-image-picker';
 import {Card} from 'react-native-paper';
 import Animated, {FadeInUp, SlideInUp} from 'react-native-reanimated';
 import {useRoute} from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import RNFS from 'react-native-fs';
+import {CameraRoll} from '@react-native-camera-roll/camera-roll';
 import BASE_URL from '../env';
 
 const Payment = ({navigation}) => {
   const [selectedMode, setSelectedMode] = useState('UPI');
-  const [selectedImage, setSelectedImage] = useState(null);
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -37,37 +39,83 @@ const Payment = ({navigation}) => {
   const coupons = params?.coupons || {};
   phoneNumber = params?.phoneNumber || '';
 
-  console.log('Coupons data' + JSON.stringify(coupons, null, 2));
-
-  console.log('Payment Screen Params:', {
-    userID,
-    cooperativeSociety,
-    flatNumber,
-    totalAmount,
-    coupons,
-    phoneNumber,
-  });
-
   const {width, height} = Dimensions.get('window');
   const isSmallScreen = width < 360 || height < 640;
 
-  const uploadButtonScale = useRef(new RNAnimated.Value(1)).current;
   const submitButtonScale = useRef(new RNAnimated.Value(1)).current;
   const backButtonScale = useRef(new RNAnimated.Value(1)).current;
+  const downloadButtonScale = useRef(new RNAnimated.Value(1)).current;
 
   useEffect(() => {
     setAmount(totalAmount.toString());
   }, [totalAmount]);
 
-  const handleImageUpload = () => {
-    ImagePicker.launchImageLibrary(
-      {mediaType: 'photo', quality: 0.8},
-      response => {
-        if (response.assets && response.assets.length > 0) {
-          setSelectedImage(response.assets[0].uri);
+  // Download QR Code function
+  const downloadQRCode = async () => {
+    try {
+      // Request permissions
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          {
+            title: 'Storage Permission',
+            message: 'This app needs storage permission to save the QR code',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          },
+        );
+
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert(
+            'Permission Denied',
+            'Cannot download without storage permission',
+          );
+          return;
         }
-      },
-    );
+      }
+
+      // For iOS, request photo library permission
+      if (Platform.OS === 'ios') {
+        const permission = await CameraRoll.requestReadWritePermission();
+        if (permission !== 'granted') {
+          Alert.alert(
+            'Permission Denied',
+            'Cannot save image without photo library access',
+          );
+          return;
+        }
+      }
+
+      const qrCodeSource = require('../assets/Images/Upi.jpeg');
+      const resolvedAsset = Image.resolveAssetSource(qrCodeSource);
+
+      // For development mode, download from Metro server first
+      const tempPath = `${RNFS.CachesDirectoryPath}/temp_qr_code.jpg`;
+
+      const downloadResult = await RNFS.downloadFile({
+        fromUrl: resolvedAsset.uri,
+        toFile: tempPath,
+      }).promise;
+
+      if (downloadResult.statusCode === 200) {
+        // Save to camera roll/gallery
+        await CameraRoll.save(tempPath, {type: 'photo'});
+
+        // Clean up temp file
+        await RNFS.unlink(tempPath);
+
+        Alert.alert('Success', 'QR Code saved to your Photos/Gallery!');
+      } else {
+        throw new Error('Download failed');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      Alert.alert(
+        'Download Failed',
+        'Could not save QR code. Please try again.',
+      );
+    }
   };
 
   const handleSubmitPayment = async () => {
@@ -77,7 +125,7 @@ const Payment = ({navigation}) => {
         userID,
         cooperativeSociety,
         flatNumber,
-        phoneNumber: params?.phoneNumber || '', // make sure you pass this from navigation params
+        phoneNumber: params?.phoneNumber || '',
         userSubscriptionAmount: totalAmount,
         userFamilySubscriptionPaidorNo: false,
         userSubscriptionDate: date.toISOString(),
@@ -104,59 +152,53 @@ const Payment = ({navigation}) => {
       const subData = await subRes.json();
       if (!subRes.ok) {
         console.error('Subscription failed:', subData);
-        alert(subData.message || 'Subscription creation failed');
+        Alert.alert('Error', subData.message || 'Subscription creation failed');
         return;
       }
       console.log('Subscription Created:', subData);
 
-      // 2. Then create payment (with image)
-      const formData = new FormData();
-      formData.append('userID', userID);
-      formData.append('cooperativeSociety', cooperativeSociety);
-      formData.append('flatNumber', flatNumber);
-      formData.append('userPaymentDate', date.toISOString());
-      formData.append('userPaymentAmount', totalAmount);
-      formData.append('userPaymentMode', selectedMode.toUpperCase());
-      formData.append('userPaymentSubscriptionDesc', 'Festival Subscription');
-      formData.append('userLastUpdatedBy', name || 'Admin');
+      // 2. Create payment without image
+      const paymentPayload = {
+        userID,
+        cooperativeSociety,
+        flatNumber,
+        userPaymentDate: date.toISOString(),
+        userPaymentAmount: totalAmount,
+        userPaymentMode: selectedMode.toUpperCase(),
+        userPaymentMethod: 'OFFLINE',
+        userPaymentSubscriptionDesc: 'Festival Subscription',
+        userLastUpdatedBy: name || 'Admin',
+      };
 
+      // Add mode-specific fields based on your backend schema
       if (selectedMode === 'UPI') {
-        formData.append('userPaymentRefID', referenceNumber);
+        paymentPayload.userPaymentRefID = referenceNumber;
       }
-      if (selectedMode === 'Cheque') {
-        formData.append('userPaymentRefID', referenceNumber);
-        formData.append('userChequeBankName', bankName);
-      }
-      if (selectedMode === 'Bank Transfer') {
-        formData.append('userPaymentRefID', referenceNumber);
-        formData.append('userTransferBankName', bankName);
+      if (selectedMode === 'BANK TRANSFER') {
+        paymentPayload.userPaymentRefID = referenceNumber;
+        paymentPayload.userTransferBankName = bankName;
       }
 
-      if (selectedImage) {
-        const filename = selectedImage.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : `image`;
+      console.log('Sending payment payload:', paymentPayload);
 
-        formData.append('userPaymentImage', {
-          uri: selectedImage,
-          name: filename,
-          type,
-        });
-      }
-
+      // Call your createPayment endpoint
       const payRes = await fetch(BASE_URL + '/userPayment/createPayment', {
         method: 'POST',
-        body: formData,
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify(paymentPayload),
       });
 
       const payData = await payRes.json();
       if (payRes.ok) {
-        console.log('Payment Submitted Successfully:', payData);
+        console.log('Payment Created Successfully:', payData);
+
         resetForm();
-        alert('Payment & Subscription submitted successfully!');
+        Alert.alert(
+          'Successfully sent the payment details',
+          'Waiting for admin approval',
+        );
         navigation.reset({
           index: 0,
           routes: [
@@ -175,16 +217,15 @@ const Payment = ({navigation}) => {
         });
       } else {
         console.error('Payment failed:', payData);
-        alert(payData.message || 'Payment failed');
+        Alert.alert('Error', payData.message || 'Payment failed');
       }
     } catch (err) {
       console.error('Error submitting payment:', err);
-      alert('Something went wrong. Try again.');
+      Alert.alert('Error', 'Something went wrong. Try again.');
     }
   };
 
   const resetForm = () => {
-    setSelectedImage(null);
     setAmount(totalAmount.toString());
     setDate(new Date());
     setReferenceNumber('');
@@ -194,9 +235,8 @@ const Payment = ({navigation}) => {
 
   const onDateChange = (event, selectedDate) => {
     const currentDate = selectedDate || date;
-    setShowDatePicker(false); // Always hide the picker after selection
+    setShowDatePicker(false);
     if (selectedDate) {
-      // Only update if user actually selected a date
       setDate(currentDate);
     }
   };
@@ -215,6 +255,22 @@ const Payment = ({navigation}) => {
       friction: 5,
       useNativeDriver: true,
     }).start();
+  };
+
+  const handleDownloadPress = () => {
+    RNAnimated.sequence([
+      RNAnimated.spring(downloadButtonScale, {
+        toValue: 0.8,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+      RNAnimated.spring(downloadButtonScale, {
+        toValue: 1,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    downloadQRCode();
   };
 
   const handleBackPress = () => {
@@ -252,7 +308,7 @@ const Payment = ({navigation}) => {
 
           <Animated.View
             key="date"
-            entering={FadeInUp.delay(100).duration(300)}>
+            entering={FadeInUp.delay(200).duration(300)}>
             <TouchableOpacity
               style={styles.dateInput}
               onPress={() => setShowDatePicker(true)}>
@@ -276,19 +332,21 @@ const Payment = ({navigation}) => {
           </Animated.View>,
         );
         break;
-      case 'Bank Transfer':
+
+      case 'BANK TRANSFER':
         formFields.push(
           <Animated.View
             key="amount"
-            entering={FadeInUp.delay(100).duration(300)}>
+            entering={FadeInUp.delay(0).duration(300)}>
             <View style={styles.amountDisplayContainer}>
               <Text style={styles.amountDisplayText}>₹{totalAmount}</Text>
               <Text style={styles.amountLabel}>Transfer Amount</Text>
             </View>
           </Animated.View>,
+
           <Animated.View
             key="bankDetails"
-            entering={FadeInUp.delay(0).duration(300)}>
+            entering={FadeInUp.delay(100).duration(300)}>
             <View style={styles.bankDetailsContainer}>
               <Text style={styles.inputLabel}>Bank Details</Text>
               <View style={styles.bankDetailsTextContainer}>
@@ -307,6 +365,7 @@ const Payment = ({navigation}) => {
               </View>
             </View>
           </Animated.View>,
+
           <Animated.View
             key="reference"
             entering={FadeInUp.delay(200).duration(300)}>
@@ -321,6 +380,7 @@ const Payment = ({navigation}) => {
               />
             </View>
           </Animated.View>,
+
           <Animated.View
             key="bank"
             entering={FadeInUp.delay(300).duration(300)}>
@@ -335,6 +395,7 @@ const Payment = ({navigation}) => {
               />
             </View>
           </Animated.View>,
+
           <Animated.View
             key="date"
             entering={FadeInUp.delay(400).duration(300)}>
@@ -361,7 +422,8 @@ const Payment = ({navigation}) => {
           </Animated.View>,
         );
         break;
-      case 'Cash':
+
+      case 'CASH':
         formFields.push(
           <Animated.View
             key="amount"
@@ -371,6 +433,7 @@ const Payment = ({navigation}) => {
               <Text style={styles.amountLabel}>Cash Amount</Text>
             </View>
           </Animated.View>,
+
           <Animated.View
             key="date"
             entering={FadeInUp.delay(100).duration(300)}>
@@ -395,6 +458,7 @@ const Payment = ({navigation}) => {
               />
             )}
           </Animated.View>,
+
           <Animated.View
             key="givenTo"
             entering={FadeInUp.delay(200).duration(300)}>
@@ -411,6 +475,7 @@ const Payment = ({navigation}) => {
           </Animated.View>,
         );
         break;
+
       default:
         return null;
     }
@@ -418,20 +483,12 @@ const Payment = ({navigation}) => {
     return (
       <>
         {formFields}
-        <Animated.View entering={FadeInUp.delay(400).duration(300)}>
-          <View style={styles.imageUploadSection}>
-            <Text style={styles.sectionTitle}>
-              {selectedMode === 'UPI'
-                ? 'UPI QR Code & Payment Screenshot'
-                : selectedMode === 'Bank Transfer'
-                ? 'Transfer Proof'
-                : 'Receipt Image'}
-            </Text>
-
-            {/* Show UPI QR Code for UPI mode */}
-            {selectedMode === 'UPI' && (
-              <View style={styles.qrCodeContainer}>
-                <Text style={styles.qrCodeLabel}>Scan QR Code to Pay</Text>
+        {/* Show UPI QR Code for UPI mode */}
+        {selectedMode === 'UPI' && (
+          <Animated.View entering={FadeInUp.delay(500).duration(300)}>
+            <View style={styles.qrCodeContainer}>
+              <Text style={styles.qrCodeLabel}>Scan QR Code to Pay</Text>
+              <View style={styles.qrCodeWrapper}>
                 <Image
                   source={require('../assets/Images/Upi.jpeg')}
                   style={[
@@ -440,49 +497,24 @@ const Payment = ({navigation}) => {
                   ]}
                   resizeMode="contain"
                 />
-              </View>
-            )}
-
-            {/* Image upload section */}
-            <View style={styles.imageContainer}>
-              <Text style={styles.uploadSectionLabel}>
-                {selectedMode === 'UPI'
-                  ? 'Upload Payment Screenshot'
-                  : 'Upload Proof'}
-              </Text>
-              {selectedImage ? (
-                <Image
-                  source={{uri: selectedImage}}
-                  style={[styles.image, isSmallScreen && styles.smallImage]}
-                />
-              ) : (
-                <View
+                {/* Download Button */}
+                <RNAnimated.View
                   style={[
-                    styles.placeholder,
-                    isSmallScreen && styles.smallPlaceholder,
+                    styles.downloadButton,
+                    {transform: [{scale: downloadButtonScale}]},
                   ]}>
-                  <View style={styles.uploadIcon}>
-                    <Text style={styles.uploadIconText}>📸</Text>
-                  </View>
-                  <Text style={styles.placeholderText}>No Image Uploaded</Text>
-                  <Text style={styles.placeholderSubtext}>Tap to upload</Text>
-                </View>
-              )}
+                  <TouchableOpacity
+                    onPress={handleDownloadPress}
+                    style={styles.downloadButtonInner}
+                    activeOpacity={0.7}>
+                    <Text style={styles.downloadIcon}>⬇</Text>
+                  </TouchableOpacity>
+                </RNAnimated.View>
+              </View>
             </View>
-          </View>
-        </Animated.View>
+          </Animated.View>
+        )}
         <View style={styles.buttonContainer}>
-          <RNAnimated.View style={{transform: [{scale: uploadButtonScale}]}}>
-            <TouchableOpacity
-              style={styles.uploadButton}
-              onPressIn={() => handleButtonPressIn(uploadButtonScale)}
-              onPressOut={() => handleButtonPressOut(uploadButtonScale)}
-              onPress={handleImageUpload}>
-              <Text style={styles.uploadButtonText}>
-                📷 {selectedImage ? 'Change Image' : 'Upload Image'}
-              </Text>
-            </TouchableOpacity>
-          </RNAnimated.View>
           <RNAnimated.View style={{transform: [{scale: submitButtonScale}]}}>
             <TouchableOpacity
               style={styles.submitButton}
@@ -528,7 +560,7 @@ const Payment = ({navigation}) => {
             </View>
 
             <View style={styles.modeSwitcher}>
-              {['UPI', 'Bank Transfer', 'Cash'].map(mode => (
+              {['UPI', 'BANK TRANSFER', 'CASH'].map(mode => (
                 <TouchableOpacity
                   key={mode}
                   onPress={() => {
@@ -545,6 +577,7 @@ const Payment = ({navigation}) => {
                       styles.modeButtonText,
                       isSmallScreen && styles.smallModeButtonText,
                       selectedMode === mode && styles.selectedModeButtonText,
+                      {textTransform: 'uppercase'},
                     ]}>
                     {mode}
                   </Text>
@@ -651,15 +684,15 @@ const styles = StyleSheet.create({
   modeButton: {
     flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 2,
+    marginHorizontal: 1,
   },
   smallModeButton: {
     paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 6,
   },
   selectedModeButton: {
     backgroundColor: '#FFFFFF',
@@ -670,12 +703,12 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   modeButtonText: {
-    fontSize: 15,
+    fontSize: 13,
     color: '#64748B',
     fontWeight: '600',
   },
   smallModeButtonText: {
-    fontSize: 13,
+    fontSize: 11,
   },
   selectedModeButtonText: {
     color: '#1E293B',
@@ -757,16 +790,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 4,
   },
-  imageUploadSection: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#374151',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
   qrCodeContainer: {
     alignItems: 'center',
     marginBottom: 20,
@@ -783,6 +806,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
   },
+  qrCodeWrapper: {
+    position: 'relative',
+  },
   qrCodeImage: {
     width: 180,
     height: 180,
@@ -792,82 +818,33 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
   },
-  imageContainer: {
-    alignItems: 'center',
+  downloadButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 10,
   },
-  uploadSectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  placeholder: {
-    width: 200,
-    height: 200,
-    backgroundColor: '#F1F5F9',
+  downloadButtonInner: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    borderStyle: 'dashed',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    shadowOffset: {width: 0, height: 3},
+    elevation: 6,
   },
-  smallPlaceholder: {
-    width: 160,
-    height: 160,
-  },
-  uploadIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#E2E8F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  uploadIconText: {
-    fontSize: 20,
-  },
-  placeholderText: {
-    color: '#64748B',
+  downloadIcon: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  placeholderSubtext: {
-    color: '#94A3B8',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  image: {
-    width: 200,
-    height: 200,
-    borderRadius: 16,
-    resizeMode: 'cover',
-  },
-  smallImage: {
-    width: 160,
-    height: 160,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
   buttonContainer: {
     gap: 12,
-  },
-  uploadButton: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    shadowColor: '#3B82F6',
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    shadowOffset: {width: 0, height: 4},
-    elevation: 5,
-  },
-  uploadButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 16,
+    marginTop: 20,
   },
   submitButton: {
     backgroundColor: '#10B981',

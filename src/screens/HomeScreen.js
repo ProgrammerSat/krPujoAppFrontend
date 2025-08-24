@@ -276,6 +276,18 @@ export default function HomePage() {
         />
 
         <AdminCard
+          title="My Dashboard"
+          subtitle="View your subscription details"
+          backgroundColor="#4ECDC4"
+          icon="📱"
+          onPress={() =>
+            navigation.navigate('User Dashboard', {
+              phoneNumber: route.params?.phoneNumber,
+            })
+          }
+        />
+
+        <AdminCard
           title="Family Directory"
           subtitle="Manage registered families"
           backgroundColor="#45B7D1"
@@ -322,8 +334,8 @@ export default function HomePage() {
 
       <View style={styles.cardsContainer}>
         <UserCard
-          title="My Subscription"
-          subtitle="Manage your puja subscription"
+          title="Pay Subscriptions"
+          subtitle="Pay your Puja Subscription"
           backgroundColor="#FF6B35"
           icon="🕉️"
           onPress={() =>
@@ -381,7 +393,7 @@ export default function HomePage() {
         ]}>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>
-            {userRole === 'U02' ? 'Admin Portal' : 'Puja Management App'}
+            {userRole === 'U02' ? 'Admin Portal' : 'Q Block Puja App'}
           </Text>
           <Text style={styles.headerSubtitle}>
             {userRole === 'U02'

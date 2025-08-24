@@ -13,7 +13,6 @@ import {
   Dimensions,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-
 import {useRoute} from '@react-navigation/native';
 
 const {width, height} = Dimensions.get('window');
@@ -38,6 +37,76 @@ if (Platform.OS === 'android') {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
 }
+
+// Fixed Modern Back Button Component
+const ModernBackButton = ({onPress}) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  const handlePressIn = () => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 0.9,
+        friction: 6,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  return (
+    <TouchableOpacity
+      style={styles.modernBackButton}
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}>
+      <Animated.View
+        style={[
+          styles.modernBackButtonInner,
+          {
+            transform: [{scale: scaleAnim}],
+          },
+        ]}>
+        {/* Custom Arrow */}
+        <View style={styles.arrowContainer}>
+          <Text style={styles.modernArrow}>‹</Text>
+        </View>
+
+        {/* Press effect overlay */}
+        <Animated.View
+          style={[
+            styles.pressOverlay,
+            {
+              opacity: opacityAnim,
+            },
+          ]}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
 
 const SubscriptionScreen = () => {
   const [selectedCounts, setSelectedCounts] = useState({
@@ -174,6 +243,11 @@ const SubscriptionScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Modern Back Button Header */}
+      <View style={styles.headerRow}>
+        <ModernBackButton onPress={() => navigation.goBack()} />
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
@@ -333,9 +407,67 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
+
+  // Fixed Modern Back Button Styles
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: scale(12),
+    paddingTop: verticalScale(10),
+    paddingBottom: verticalScale(6),
+  },
+  modernBackButton: {
+    width: scale(48),
+    height: scale(48),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: scale(8),
+  },
+  modernBackButtonInner: {
+    width: scale(44),
+    height: scale(44),
+    borderRadius: scale(22),
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#3b82f6',
+    shadowOpacity: 0.2,
+    shadowOffset: {width: 0, height: 3},
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
+  },
+  arrowContainer: {
+    width: scale(24),
+    height: scale(24),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: scale(-2),
+  },
+  modernArrow: {
+    fontSize: moderateScale(26),
+    fontWeight: '600',
+    color: '#3b82f6',
+    lineHeight: moderateScale(26),
+    textAlign: 'center',
+  },
+  pressOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#3b82f6',
+    borderRadius: scale(22),
+    opacity: 0,
+  },
+
   scrollContainer: {
     flexGrow: 1,
     padding: scale(12),
+    paddingTop: verticalScale(8),
     paddingBottom: verticalScale(20),
   },
   card: {
@@ -591,19 +723,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: moderateScale(isSmallScreen ? 13 : 15),
     letterSpacing: 0.5,
-  },
-  buttonIcon: {
-    marginLeft: scale(10),
-    width: scale(20),
-    height: scale(20),
-    borderRadius: scale(10),
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowText: {
-    color: '#ffffff',
-    fontSize: moderateScale(isSmallScreen ? 12 : 14),
-    fontWeight: '700',
   },
 });

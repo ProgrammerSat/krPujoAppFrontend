@@ -82,13 +82,17 @@ const Login = ({navigation}) => {
         console.log('Login Success:', data);
         console.log('Success', 'Logged in successfully!');
 
-        navigation.navigate('Home', {
-          userRole: data.user.userRole,
-          userID: data.user.id,
-          name: data.user.name,
-          cooperativeSociety: data.user.cooperativeSociety,
-          flatNumber: data.user.flatNumber,
-          phoneNumber: data.user.phoneNumber,
+        navigation.reset({
+          index: 0,
+          routes: [{name: 'Home'}],
+          params: {
+            userRole: data.user.userRole,
+            userID: data.user.id,
+            name: data.user.name,
+            cooperativeSociety: data.user.cooperativeSociety,
+            flatNumber: data.user.flatNumber,
+            phoneNumber: data.user.phoneNumber,
+          },
         });
       }
     } catch (err) {
@@ -118,7 +122,7 @@ const Login = ({navigation}) => {
               resizeMode="cover"
             />
           </View>
-          <Text style={styles.appTitle}>Puja Management</Text>
+          <Text style={styles.appTitle}>Q Block Puja App</Text>
           <Text style={styles.subtitle}>Welcome back</Text>
         </Animated.View>
       </View>
@@ -178,6 +182,14 @@ const Login = ({navigation}) => {
             style={styles.registerLink}>
             <Text style={styles.linkText}>
               Forgot Password? <Text style={styles.linkTextBold}>Update</Text>
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigation?.navigate?.('Register')}
+            style={styles.registerLink}>
+            <Text style={styles.linkText}>
+              New User? <Text style={styles.linkTextBold}>Register</Text>
             </Text>
           </TouchableOpacity>
         </ScrollView>
