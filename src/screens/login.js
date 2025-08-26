@@ -11,11 +11,15 @@ import {
   Keyboard,
   Alert,
   Image,
+  Platform,
 } from 'react-native';
 
 import BASE_URL from '../env';
 
 const {width, height} = Dimensions.get('window');
+
+// Import the image at the top level
+const logoImage = require('../assets/Images/durgaMaFace.png');
 
 const Login = ({navigation}) => {
   const [mobile, setMobile] = useState('');
@@ -53,6 +57,17 @@ const Login = ({navigation}) => {
     // Dismiss keyboard first
     Keyboard.dismiss();
 
+    // Basic validation
+    if (!mobile.trim()) {
+      Alert.alert('Error', 'Please enter your mobile number.');
+      return;
+    }
+
+    if (!password.trim()) {
+      Alert.alert('Error', 'Please enter your password.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -82,22 +97,36 @@ const Login = ({navigation}) => {
         console.log('Login Success:', data);
         console.log('Success', 'Logged in successfully!');
 
+        // Fixed navigation reset - params should be inside the route object
         navigation.reset({
           index: 0,
-          routes: [{name: 'Home'}],
-          params: {
-            userRole: data.user.userRole,
-            userID: data.user.id,
-            name: data.user.name,
-            cooperativeSociety: data.user.cooperativeSociety,
-            flatNumber: data.user.flatNumber,
-            phoneNumber: data.user.phoneNumber,
-          },
+          routes: [
+            {
+              name: 'Home',
+              params: {
+                userRole: data.user.userRole,
+                userID: data.user.id,
+                name: data.user.name,
+                cooperativeSociety: data.user.cooperativeSociety,
+                flatNumber: data.user.flatNumber,
+                phoneNumber: data.user.phoneNumber,
+              },
+            },
+          ],
         });
+      } else {
+        // Handle login failure
+        Alert.alert(
+          'Login Failed',
+          data.message || 'Invalid credentials. Please try again.',
+        );
       }
     } catch (err) {
       console.error('Login error:', err);
-      Alert.alert('Error', 'Unable to login. Please try again later.');
+      Alert.alert(
+        'Error',
+        'Unable to login. Please check your connection and try again.',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -117,9 +146,16 @@ const Login = ({navigation}) => {
           ]}>
           <View style={styles.logoContainer}>
             <Image
-              source={require('../assets/Images/durgaMaFace.jpeg')}
+              source={logoImage}
               style={styles.logoImage}
-              resizeMode="cover"
+              resizeMode="contain"
+              onError={error => {
+                console.log('Image load error:', error);
+              }}
+              onLoad={() => {
+                console.log('Image loaded successfully');
+              }}
+              defaultSource={require('../assets/Images/durgaMaFace.png')}
             />
           </View>
           <Text style={styles.appTitle}>Q Block Puja App</Text>
@@ -149,6 +185,8 @@ const Login = ({navigation}) => {
                 keyboardType="phone-pad"
                 value={mobile}
                 onChangeText={setMobile}
+                maxLength={10}
+                autoCapitalize="none"
               />
             </View>
           </View>
@@ -163,6 +201,7 @@ const Login = ({navigation}) => {
                 secureTextEntry
                 value={password}
                 onChangeText={setPassword}
+                autoCapitalize="none"
               />
             </View>
           </View>
@@ -173,7 +212,7 @@ const Login = ({navigation}) => {
             disabled={isLoading}
             activeOpacity={0.8}>
             <Text style={styles.buttonText}>
-              {isLoading ? 'Signing In...' : 'LOGIN'}
+              {isLoading ? 'SIGNING IN...' : 'LOGIN'}
             </Text>
           </TouchableOpacity>
 
@@ -232,12 +271,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
-    overflow: 'hidden', // Important for circular image
+    overflow: 'hidden',
   },
   logoImage: {
     width: 70,
     height: 70,
-    borderRadius: 35, // Make it circular
+    borderRadius: 35,
   },
   logoText: {
     fontSize: 40,

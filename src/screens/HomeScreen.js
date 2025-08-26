@@ -282,7 +282,12 @@ export default function HomePage() {
           icon="📱"
           onPress={() =>
             navigation.navigate('User Dashboard', {
+              userRole,
+              userID,
+              cooperativeSociety,
+              flatNumber,
               phoneNumber: route.params?.phoneNumber,
+              name,
             })
           }
         />
@@ -357,7 +362,12 @@ export default function HomePage() {
           icon="📱"
           onPress={() =>
             navigation.navigate('User Dashboard', {
+              userRole,
+              userID,
+              cooperativeSociety,
+              flatNumber,
               phoneNumber: route.params?.phoneNumber,
+              name,
             })
           }
         />

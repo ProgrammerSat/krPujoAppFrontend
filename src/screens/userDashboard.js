@@ -17,7 +17,8 @@ import {useNavigation} from '@react-navigation/native';
 const {width, height} = Dimensions.get('window');
 
 const UserDashboard = ({route}) => {
-  const {phoneNumber} = route?.params || {};
+  const {phoneNumber, userID, cooperativeSociety, flatNumber, name} =
+    route?.params || {};
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -109,7 +110,13 @@ const UserDashboard = ({route}) => {
   };
 
   const handleSubscribe = () => {
-    navigation.navigate('Subscription'); // Change 'Subscription' to your actual subscription route name
+    navigation.navigate('Subscription', {
+      userID,
+      name,
+      cooperativeSociety,
+      flatNumber,
+      phoneNumber,
+    }); // Change 'Subscription' to your actual subscription route name
   };
 
   if (loading && !dashboardData) {

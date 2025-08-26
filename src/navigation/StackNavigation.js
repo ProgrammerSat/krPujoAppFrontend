@@ -83,7 +83,7 @@ export default props => {
             userRole: props?.route?.params?.userRole,
             userCpnActiveStatus: props?.route?.params?.userCpnActiveStatus,
             phoneNumber: props?.route?.params?.phoneNumber,
-            coupons: props?.route?.params?.coupons,
+            totalCoupons : props?.route?.params?.totalCoupons,
           }}
         />
         <Stack.Screen
@@ -107,7 +107,18 @@ export default props => {
         />
         <Stack.Screen name="FamilyList" component={FamilyListScreen} />
         <Stack.Screen name="Admin Approval" component={AdminApproval} />
-        <Stack.Screen name="User Dashboard" component={UserDashboard} />
+        <Stack.Screen
+          name="User Dashboard"
+          component={UserDashboard}
+          initialParams={{
+            userRole: props?.route?.params?.userRole,
+            userID: props?.route?.params?.userID,
+            cooperativeSociety: props?.route?.params?.cooperativeSociety,
+            flatNumber: props?.route?.params?.flatNumber,
+            phoneNumber: props?.route?.params?.phoneNumber,
+            name: props?.route?.params?.name,
+          }}
+        />
         <Stack.Screen name="Verify Secret" component={VerifySecretCode} />
         <Stack.Screen
           name="UpdatePassword"

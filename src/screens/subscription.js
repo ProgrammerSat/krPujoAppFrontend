@@ -16,7 +16,6 @@ import {useNavigation} from '@react-navigation/native';
 import {useRoute} from '@react-navigation/native';
 
 const {width, height} = Dimensions.get('window');
-const EVENTS = ['Saptami', 'Nabami', 'Dashami'];
 const PRICE_PER_PERSON = 500;
 const FAMILY_MUST_PAY = 1000;
 
@@ -108,12 +107,8 @@ const ModernBackButton = ({onPress}) => {
   );
 };
 
-const SubscriptionScreen = () => {
-  const [selectedCounts, setSelectedCounts] = useState({
-    Saptami: 0,
-    Nabami: 0,
-    Dashami: 0,
-  });
+const SubscriptionScreen = ({navigation}) => {
+  const [totalCoupons, setTotalCoupons] = useState(0);
 
   const {params} = useRoute();
   const userID = params?.userID || '';
@@ -128,13 +123,10 @@ const SubscriptionScreen = () => {
     flatNumber,
   });
 
-  const navigation = useNavigation();
   const opacity = useRef(new Animated.Value(0)).current;
   const slideY = useRef(new Animated.Value(30)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
-  const cardAnimations = useRef(
-    EVENTS.map(() => new Animated.Value(1)),
-  ).current;
+  const cardAnimation = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -151,7 +143,7 @@ const SubscriptionScreen = () => {
     ]).start();
   }, []);
 
-  const handleIncrement = (event, index) => {
+  const handleIncrement = () => {
     LayoutAnimation.configureNext({
       duration: 300,
       create: {
@@ -166,25 +158,22 @@ const SubscriptionScreen = () => {
 
     // Animate card scale
     Animated.sequence([
-      Animated.timing(cardAnimations[index], {
+      Animated.timing(cardAnimation, {
         toValue: 1.02,
         duration: 100,
         useNativeDriver: true,
       }),
-      Animated.timing(cardAnimations[index], {
+      Animated.timing(cardAnimation, {
         toValue: 1,
         duration: 200,
         useNativeDriver: true,
       }),
     ]).start();
 
-    setSelectedCounts(prev => ({
-      ...prev,
-      [event]: Math.min(prev[event] + 1, 100),
-    }));
+    setTotalCoupons(prev => Math.min(prev + 1, 100));
   };
 
-  const handleDecrement = (event, index) => {
+  const handleDecrement = () => {
     LayoutAnimation.configureNext({
       duration: 300,
       create: {
@@ -199,29 +188,22 @@ const SubscriptionScreen = () => {
 
     // Animate card scale
     Animated.sequence([
-      Animated.timing(cardAnimations[index], {
+      Animated.timing(cardAnimation, {
         toValue: 0.98,
         duration: 100,
         useNativeDriver: true,
       }),
-      Animated.timing(cardAnimations[index], {
+      Animated.timing(cardAnimation, {
         toValue: 1,
         duration: 200,
         useNativeDriver: true,
       }),
     ]).start();
 
-    setSelectedCounts(prev => ({
-      ...prev,
-      [event]: Math.max(prev[event] - 1, 0),
-    }));
+    setTotalCoupons(prev => Math.max(prev - 1, 0));
   };
 
-  const totalPersons = Object.values(selectedCounts).reduce(
-    (sum, val) => sum + val,
-    0,
-  );
-  const totalAmount = totalPersons * PRICE_PER_PERSON + FAMILY_MUST_PAY;
+  const totalAmount = totalCoupons * PRICE_PER_PERSON + FAMILY_MUST_PAY;
 
   const handleButtonPressIn = () => {
     Animated.spring(buttonScale, {
@@ -280,84 +262,73 @@ const SubscriptionScreen = () => {
             </View>
           </View>
 
-          {/* Book Lunch Section */}
+          {/* Book Coupons Section */}
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeading}>Book Lunch</Text>
+            <Text style={styles.sectionHeading}>Book Coupons</Text>
             <View style={styles.sectionUnderline} />
           </View>
 
-          {EVENTS.map((event, index) => (
-            <Animated.View
-              key={event}
-              style={[
-                styles.eventCard,
-                {transform: [{scale: cardAnimations[index]}]},
-              ]}>
-              <View style={styles.eventHeader}>
-                <Text style={styles.eventName}>{event}</Text>
-                <View style={styles.eventBadge}>
-                  <Text style={styles.badgeText}>LUNCH</Text>
-                </View>
+          {/* Single Coupon Selection Card */}
+          <Animated.View
+            style={[styles.eventCard, {transform: [{scale: cardAnimation}]}]}>
+            <View style={styles.eventHeader}>
+              <Text style={styles.eventName}>Total Coupons</Text>
+              <View style={styles.eventBadge}>
+                <Text style={styles.badgeText}>LUNCH</Text>
               </View>
+            </View>
 
-              <View style={styles.eventBody}>
-                <View style={styles.counterContainer}>
-                  <TouchableOpacity
+            <View style={styles.eventBody}>
+              <View style={styles.counterContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.counterButton,
+                    totalCoupons === 0 && styles.counterButtonDisabled,
+                  ]}
+                  onPress={handleDecrement}
+                  activeOpacity={0.7}>
+                  <Text
                     style={[
-                      styles.counterButton,
-                      selectedCounts[event] === 0 &&
-                        styles.counterButtonDisabled,
-                    ]}
-                    onPress={() => handleDecrement(event, index)}
-                    activeOpacity={0.7}>
-                    <Text
-                      style={[
-                        styles.counterText,
-                        selectedCounts[event] === 0 &&
-                          styles.counterTextDisabled,
-                      ]}>
-                      −
-                    </Text>
-                  </TouchableOpacity>
+                      styles.counterText,
+                      totalCoupons === 0 && styles.counterTextDisabled,
+                    ]}>
+                    −
+                  </Text>
+                </TouchableOpacity>
 
-                  <View style={styles.counterValueContainer}>
-                    <Text style={styles.counterValue}>
-                      {selectedCounts[event]}
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.counterButton,
-                      selectedCounts[event] === 4 &&
-                        styles.counterButtonDisabled,
-                    ]}
-                    onPress={() => handleIncrement(event, index)}
-                    activeOpacity={0.7}>
-                    <Text
-                      style={[
-                        styles.counterText,
-                        selectedCounts[event] === 4 &&
-                          styles.counterTextDisabled,
-                      ]}>
-                      +
-                    </Text>
-                  </TouchableOpacity>
+                <View style={styles.counterValueContainer}>
+                  <Text style={styles.counterValue}>{totalCoupons}</Text>
                 </View>
 
-                <Text style={styles.perPerson}>
-                  ₹{PRICE_PER_PERSON} per person
-                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.counterButton,
+                    totalCoupons === 100 && styles.counterButtonDisabled,
+                  ]}
+                  onPress={handleIncrement}
+                  activeOpacity={0.7}>
+                  <Text
+                    style={[
+                      styles.counterText,
+                      totalCoupons === 100 && styles.counterTextDisabled,
+                    ]}>
+                    +
+                  </Text>
+                </TouchableOpacity>
               </View>
-            </Animated.View>
-          ))}
+
+              <Text style={styles.perPerson}>
+                ₹{PRICE_PER_PERSON} per coupon
+              </Text>
+            </View>
+          </Animated.View>
 
           {/* Total Section */}
           <View style={styles.totalCard}>
             <Text style={styles.totalLabel}>Total Amount</Text>
             <View style={styles.totalBreakdown}>
               <Text style={styles.breakdownText}>
-                Base: ₹{FAMILY_MUST_PAY} + {totalPersons} × ₹{PRICE_PER_PERSON}
+                Base: ₹{FAMILY_MUST_PAY} + {totalCoupons} × ₹{PRICE_PER_PERSON}
               </Text>
             </View>
             <View style={styles.totalAmountContainer}>
@@ -381,11 +352,7 @@ const SubscriptionScreen = () => {
                   flatNumber,
                   totalAmount,
                   phoneNumber,
-                  coupons: {
-                    Saptami: selectedCounts.Saptami,
-                    Nabami: selectedCounts.Nabami,
-                    Dashami: selectedCounts.Dashami,
-                  },
+                  totalCoupons: totalCoupons,
                 });
               }}
               activeOpacity={0.9}>

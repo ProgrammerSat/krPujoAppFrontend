@@ -36,7 +36,7 @@ const Payment = ({navigation}) => {
   const cooperativeSociety = params?.cooperativeSociety || '';
   const flatNumber = params?.flatNumber || 0;
   const totalAmount = params?.totalAmount || 0;
-  const coupons = params?.coupons || {};
+  const totalCoupons = params?.totalCoupons || {};
   phoneNumber = params?.phoneNumber || '';
 
   const {width, height} = Dimensions.get('window');
@@ -135,9 +135,9 @@ const Payment = ({navigation}) => {
         userSubscriptionPaymentRef: referenceNumber,
         userSubscriptionCreatedBy: name || 'Admin',
         userSubscriptionLastUpdatedBy: name || 'Admin',
-        SaptamiCoupons: coupons?.Saptami || 0,
-        NabamiCoupons: coupons?.Nabami || 0,
-        DashamiCoupons: coupons?.Dashami || 0,
+        SaptamiCoupons: totalCoupons || 0,
+        NabamiCoupons: totalCoupons || 0,
+        DashamiCoupons: totalCoupons || 0,
       };
 
       const subRes = await fetch(
